@@ -104,18 +104,26 @@ impl Player for HumanPlayer {
     fn play_turn(&self, grid: &mut Grid) -> bool {
         let mut success = false;
         let mut input = 0;
+        println!(
+            "{} ({}) - Enter your move (1-9): ",
+            self.name,
+            self.symbol.to_str()
+        );
         while !success {
-            println!(
-                "{} ({}) - Enter your move (1-9): ",
-                self.name,
-                self.symbol.to_str()
-            );
             let mut input_str = String::new();
             std::io::stdin().read_line(&mut input_str).unwrap();
-            input = input_str.trim().parse::<usize>().unwrap() - 1; // Convert to 0-based index
-            success = grid.set_symbol(input, self.symbol);
-            if !success {
-                println!("Invalid move! Try again.");
+
+            match input_str.trim().parse::<usize>() {
+                Ok(parsed_input) => {
+                    input = parsed_input - 1; // Convert to 0-based index
+                    success = grid.set_symbol(input, self.symbol);
+                    if !success {
+                        println!("Invalid move! Try again.");
+                    }
+                }
+                Err(_) => {
+                    println!("Please enter a valid number (1-9)!");
+                }
             }
         }
         println!(
