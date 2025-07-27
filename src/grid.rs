@@ -1,6 +1,7 @@
 use crate::symbols::Symbol;
 
 // Array of Symbols seems cleanest for a small grid, since we already implemented the Symbol type
+// For larger/mutable grids I would use vector
 pub struct Grid(pub [Symbol; 9]);
 
 impl Grid {
@@ -60,4 +61,36 @@ impl Grid {
         }
         false
     }
+}
+
+pub fn grid_to_index(grid: &Grid) -> usize {
+    let mut index = 0;
+    for (i, &symbol) in grid.0.iter().enumerate() {
+        let symbol_num = match symbol {
+            Symbol::Empty => 0,
+            Symbol::Cross => 1,
+            Symbol::Circle => 2,
+        };
+        // Convert to trinary number
+        index += symbol_num * 3_usize.pow(i as u32);
+    }
+    index
+}
+
+pub fn index_to_grid(index: usize) -> Grid {
+    let mut grid = Grid::new();
+    let mut grid_num = index;
+
+    for i in 0..9 {
+        let symbol_num = grid_num % 3; // get last digit
+        grid.0[i] = match symbol_num {
+            0 => Symbol::Empty,
+            1 => Symbol::Cross,
+            2 => Symbol::Circle,
+            _ => unreachable!(), // This should never happen since we only use 0, 1, 2
+        };
+        grid_num /= 3; // remove last digit
+    }
+
+    grid
 }
