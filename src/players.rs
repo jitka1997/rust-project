@@ -1,4 +1,4 @@
-use crate::grid::{Grid, grid_to_index};
+use crate::grid::{Grid, grid_to_index, index_to_grid};
 use crate::symbols::Symbol;
 use rand::Rng;
 
@@ -23,6 +23,7 @@ pub fn play(player1: &mut dyn Player, player2: &mut dyn Player) -> usize {
 
     while !grid.is_full() {
         // grid.print();
+        // println!();
         if current_player.play_turn(&mut grid) {
             if grid.is_won() {
                 // grid.print();
@@ -184,7 +185,7 @@ pub struct MenacePlayer {
 
 impl MenacePlayer {
     pub fn new(name: String, symbol: Symbol) -> Self {
-        let initial_matches = [100, 100, 100, 100, 100, 100, 100, 100, 100];
+        let initial_matches = [255, 255, 255, 255, 255, 255, 255, 255, 255];
         let grids = vec![initial_matches; 3_usize.pow(9) - 1];
         MenacePlayer {
             name,
@@ -216,17 +217,22 @@ impl Player for MenacePlayer {
 
     fn play_turn(&mut self, grid: &mut Grid) -> bool {
         let index = grid_to_index(grid);
+        let mut matchbox = self.grids[index];
 
-        // Weighted random selection https://docs.rs/nannou/latest/nannou/rand/rand/distributions/struct.WeightedIndex.htmls
-        let matchbox = self.grids[index];
-        if matchbox.iter().all(|&weight| weight == 0) {
-            // TODO: probably random move, or some other logic
-            let index = random_empty_position(grid);
-            grid.set_symbol(index, self.symbol);
-            println!("No valid moves left in matchbox, selecting randomly.");
-            return true;
+        // If all possible moves in the matchbox are 0, refill it
+        let mut refill = true;
+        for (i, &weight) in matchbox.iter().enumerate() {
+            if grid.0[i] == Symbol::Empty && weight != 0 {
+                refill = false;
+            }
+        }
+        if refill {
+            // Refill the matchbox
+            matchbox = [255; 9];
+            self.grids[index] = matchbox;
         }
 
+        // Weighted random selection https://docs.rs/nannou/latest/nannou/rand/rand/distributions/struct.WeightedIndex.htmls
         let mut weights: Vec<usize> = Vec::new();
         for i in 0..9 {
             if grid.0[i] == Symbol::Empty {
@@ -241,6 +247,9 @@ impl Player for MenacePlayer {
         let selected_index = dist.sample(&mut rng);
         // println!("{:?} index {}", weights, selected_index);
 
+        self.grids_this_game.push(grid_to_index(grid));
+        self.positions_this_game.push(selected_index);
+
         grid.set_symbol(selected_index, self.symbol);
         // println!(
         //     "{} ({}) played at index {}",
@@ -248,16 +257,41 @@ impl Player for MenacePlayer {
         //     self.symbol.to_str(),
         //     selected_index
         // );
-        self.grids_this_game.push(grid_to_index(grid));
-        self.positions_this_game.push(selected_index);
         true
     }
 
     fn you_won(&mut self) {
+        // println!("I won!");
+        // // let mut weights_before = Vec::new();
+        // // let mut weights_after = Vec::new();
+        // println!("{:?}", self.grids_this_game);
+        // println!("{:?}", self.positions_this_game);
+        // for grid in self.grids_this_game.iter() {
+        //     println!("Grid index: {}", grid);
+        //     index_to_grid(*grid).print();
+        // }
+
         for (i, &grid_index) in self.grids_this_game.iter().enumerate() {
-            self.grids[grid_index][self.positions_this_game[i]] += 20; // Increase the weight of the winning move
+            // weights_before.push(self.grids[grid_index]);
+            self.grids[grid_index][self.positions_this_game[i]] += 1; // Increase the weight of the winning move
+            // weights_after.push(self.grids[grid_index]);
+        }
+        // println!("Weights before: {:?}", weights_before);
+        // println!("Weights after: {:?}", weights_after);
+        self.reset();
+    }
+
+    fn you_lost(&mut self) {
+        for (i, &grid_index) in self.grids_this_game.iter().enumerate() {
+            // Decrease the weight of the losing move, but min 0 using https://users.rust-lang.org/t/is-there-a-more-idiomatic-way-of-doing-this/56768/6
+            self.grids[grid_index][self.positions_this_game[i]] =
+                match self.grids[grid_index][self.positions_this_game[i]].checked_sub(5) {
+                    Some(value) => value,
+                    None => 0, // Prevent underflow
+                };
         }
 
+        // print number of overall modified matchboxes for debugging
         // let mut x = 0;
         // for (i, grid) in self
         //     .grids
@@ -272,31 +306,8 @@ impl Player for MenacePlayer {
         self.reset();
     }
 
-    fn you_lost(&mut self) {
-        for (i, &grid_index) in self.grids_this_game.iter().enumerate() {
-            // Decrease the weight of the losing move, but min 0 using https://users.rust-lang.org/t/is-there-a-more-idiomatic-way-of-doing-this/56768/6
-            self.grids[grid_index][self.positions_this_game[i]] =
-                match self.grids[grid_index][self.positions_this_game[i]].checked_sub(5) {
-                    Some(value) => value,
-                    None => 0, // Prevent underflow
-                };
-        }
-        // print number of overall modified matchboxes for debugging
-        let mut x = 0;
-        // for (i, grid) in self
-        //     .grids
-        //     .iter()
-        //     .filter(|grid| grid.iter().any(|&weight| weight != 100))
-        //     .enumerate()
-        // {
-        //     x += 1;
-        // }
-        // println!("Number of modified matchboxes: {}", x);
-
-        self.reset();
-    }
-
     fn its_a_tie(&mut self) {
+        // println!("It's a tie!");
         // let mut x = 0;
         // for (i, grid) in self
         //     .grids

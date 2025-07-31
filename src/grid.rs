@@ -28,6 +28,23 @@ impl Grid {
         }
     }
 
+    pub fn get_pretty_string(&self) -> String {
+        let mut result = String::new();
+        for (i, row) in self.0.chunks(3).enumerate() {
+            for (j, &cell) in row.iter().enumerate() {
+                if j > 0 {
+                    result.push('|');
+                }
+                result.push_str(&format!(" {} ", cell.to_str()));
+            }
+            result.push('\n');
+            if i < 2 {
+                result.push_str("-----------\n");
+            }
+        }
+        result
+    }
+
     pub fn set_symbol(&mut self, index: usize, symbol: Symbol) -> bool {
         if (index >= 9) || self.0[index] != Symbol::Empty {
             return false; // Invalid index or cell already occupied
@@ -68,8 +85,8 @@ pub fn grid_to_index(grid: &Grid) -> usize {
     for (i, &symbol) in grid.0.iter().enumerate() {
         let symbol_num = match symbol {
             Symbol::Empty => 0,
-            Symbol::Cross => 1,
-            Symbol::Circle => 2,
+            Symbol::Circle => 1,
+            Symbol::Cross => 2,
         };
         // Convert to trinary number
         index += symbol_num * 3_usize.pow(i as u32);
@@ -85,8 +102,8 @@ pub fn index_to_grid(index: usize) -> Grid {
         let symbol_num = grid_num % 3; // get last digit
         grid.0[i] = match symbol_num {
             0 => Symbol::Empty,
-            1 => Symbol::Cross,
-            2 => Symbol::Circle,
+            1 => Symbol::Circle,
+            2 => Symbol::Cross,
             _ => unreachable!(), // This should never happen since we only use 0, 1, 2
         };
         grid_num /= 3; // remove last digit

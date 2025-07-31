@@ -32,8 +32,8 @@ fn main() {
     // let new_grid = grid::index_to_grid(index);
     // new_grid.print();
 
-    let mut player1 = players::RandomPlayer::new("Randomak".to_string(), symbols::Symbol::Cross);
-    let mut player2 = players::MenacePlayer::new("Menace".to_string(), symbols::Symbol::Circle);
+    let mut player1 = players::MenacePlayer::new("Menace".to_string(), symbols::Symbol::Circle);
+    let mut player2 = players::RandomPlayer::new("Randomak".to_string(), symbols::Symbol::Cross);
     let mut results = Vec::new();
     for i in 0..10000000 {
         if i % 1000000 == 0 {
@@ -42,23 +42,50 @@ fn main() {
         let result = players::play(&mut player1, &mut player2);
         results.push(match result {
             0 => 0,   // Tie
-            1 => -1,  // Player 1 won
-            2 => 1,   // Player 2 won
+            1 => 1,   // Player 1 won
+            2 => -1,  // Player 2 won
             _ => 999, // Unknown result, should not happen
         });
     }
-    let grids = player2.get_grids();
+    let grids = player1.get_grids();
     let file = File::create("matchboxes").unwrap();
     let mut writer = BufWriter::new(file);
     for matchbox in grids {
         writeln!(writer, "{:?}", matchbox).unwrap();
     }
 
-    let initial_matchbox = [100, 100, 100, 100, 100, 100, 100, 100, 100];
-    let changed_count = grids
+    let initial_matchbox = [255, 255, 255, 255, 255, 255, 255, 255, 255];
+    let changed = grids
         .iter()
         .filter(|&matchbox| *matchbox != initial_matchbox)
-        .count();
+        .collect::<Vec<_>>();
+    let changed_indexes: Vec<usize> = grids
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &matchbox)| {
+            if matchbox != initial_matchbox {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let changed_count = changed.len();
+
+    let file = File::create("matchboxes").unwrap();
+    let mut writer = BufWriter::new(file);
+    writeln!(writer, "Changed matchboxes: {}", changed_count).unwrap();
+    for (i, matchbox) in changed.iter().enumerate() {
+        writeln!(writer, "{:?}", matchbox).unwrap();
+        writeln!(writer, "Index: {}", changed_indexes[i]).unwrap();
+        write!(
+            writer,
+            "{}",
+            grid::index_to_grid(changed_indexes[i]).get_pretty_string()
+        )
+        .unwrap(); // Use write! not writeln!
+        writeln!(writer, "").unwrap(); // Add extra newline for separation
+    }
 
     println!("Number of matchboxes that changed: {}", changed_count);
     println!("Total matchboxes: {}", grids.len());
