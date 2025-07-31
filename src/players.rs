@@ -1,4 +1,4 @@
-use crate::grid::{Grid, grid_to_index, index_to_grid};
+use crate::grid::{Grid, grid_to_index};
 use crate::symbols::Symbol;
 use rand::Rng;
 
@@ -8,55 +8,74 @@ use rand::prelude::*;
 
 // Common behavior for all player types
 pub trait Player {
-    fn play_turn(&mut self, grid: &mut Grid) -> bool; // Returns true if the turn was successful
-    fn you_won(&mut self); // Notify the player that they have won
+    fn play_turn(&mut self, grid: &mut Grid); // Returns true if the turn was successful
     fn get_symbol(&self) -> Symbol;
     fn get_name(&self) -> &str;
-    fn you_lost(&mut self);
-    fn its_a_tie(&mut self);
+    fn you_won(&mut self) {}
+    fn you_lost(&mut self) {}
+    fn its_a_tie(&mut self) {}
+    fn set_verbose(&mut self);
 }
 
-pub fn play(player1: &mut dyn Player, player2: &mut dyn Player) -> usize {
+pub fn play(player1: &mut dyn Player, player2: &mut dyn Player, verbose: bool) -> usize {
+    if verbose {
+        player1.set_verbose();
+        player2.set_verbose();
+    }
+
     // Initialize the grid and set the first player
     let mut grid = Grid::new();
     let mut current_player: &mut dyn Player = player1;
 
     while !grid.is_full() {
-        // grid.print();
-        // println!();
-        if current_player.play_turn(&mut grid) {
-            if grid.is_won() {
-                // grid.print();
-                current_player.you_won();
-                if current_player.get_symbol() == player1.get_symbol() {
-                    player2.you_lost();
-                    // println!(
-                    //     "Player {} ({}) wins!",
-                    //     player1.get_name(),
-                    //     player1.get_symbol().to_str()
-                    // );
-                    return 1; // Player 1 won
-                } else {
-                    player1.you_lost();
-                    // println!(
-                    //     "Player {} ({}) wins!",
-                    //     player2.get_name(),
-                    //     player2.get_symbol().to_str()
-                    // );
-                    return 2; // Player 2 won
-                }
-            }
-            // Switch players
-            current_player = if current_player.get_symbol() == player1.get_symbol() {
-                player2
-            } else {
-                player1
-            };
+        if verbose {
+            grid.print();
+            println!();
         }
+        current_player.play_turn(&mut grid);
+
+        if grid.is_won() {
+            if verbose {
+                grid.print();
+            }
+            current_player.you_won();
+            if current_player.get_symbol() == player1.get_symbol() {
+                player2.you_lost();
+                if verbose {
+                    println!(
+                        "Player {} ({}) wins!",
+                        player1.get_name(),
+                        player1.get_symbol().to_str()
+                    );
+                    println!();
+                }
+                return 1; // Player 1 won
+            } else {
+                player1.you_lost();
+                if verbose {
+                    println!(
+                        "Player {} ({}) wins!",
+                        player2.get_name(),
+                        player2.get_symbol().to_str()
+                    );
+                    println!();
+                }
+                return 2; // Player 2 won
+            }
+        }
+
+        // Switch players
+        current_player = if current_player.get_symbol() == player1.get_symbol() {
+            player2
+        } else {
+            player1
+        };
     }
 
-    // grid.print();
-    // println!("The game ended in a draw!");
+    if verbose {
+        grid.print();
+        println!("The game ended in a draw!");
+    }
     player1.its_a_tie();
     player2.its_a_tie();
     0 // Return 0 for a tie
@@ -65,18 +84,17 @@ pub fn play(player1: &mut dyn Player, player2: &mut dyn Player) -> usize {
 pub struct RandomPlayer {
     name: String,
     symbol: Symbol,
+    verbose: bool,
 }
 
 impl RandomPlayer {
     pub fn new(name: String, symbol: Symbol) -> Self {
-        RandomPlayer { name, symbol }
+        RandomPlayer {
+            name,
+            symbol,
+            verbose: false,
+        }
     }
-}
-
-fn random_empty_position(grid: &Grid) -> usize {
-    let empty_positions: Vec<usize> = (0..9).filter(|&i| grid.0[i] == Symbol::Empty).collect();
-    let mut rng = rand::thread_rng();
-    empty_positions[rng.gen_range(0..empty_positions.len())]
 }
 
 impl Player for RandomPlayer {
@@ -88,40 +106,40 @@ impl Player for RandomPlayer {
         &self.name
     }
 
-    // TODO: Remove prints when it works
-    fn play_turn(&mut self, grid: &mut Grid) -> bool {
-        let index = random_empty_position(grid);
-
-        if grid.set_symbol(index, self.symbol) {
-            // println!(
-            //     "{} ({}) played at index {}",
-            //     self.name,
-            //     self.symbol.to_str(),
-            //     index
-            // );
-            true
-        } else {
-            println!(
-                "{} tried to play at index {}, but it was invalid",
-                self.name, index
-            );
-            false
-        }
+    fn set_verbose(&mut self) {
+        self.verbose = true;
     }
 
-    fn you_won(&mut self) {}
-    fn you_lost(&mut self) {}
-    fn its_a_tie(&mut self) {}
+    fn play_turn(&mut self, grid: &mut Grid) {
+        let empty_positions: Vec<usize> = (0..9).filter(|&i| grid.0[i] == Symbol::Empty).collect();
+        let mut rng = rand::thread_rng();
+        let index = empty_positions[rng.gen_range(0..empty_positions.len())];
+
+        grid.set_symbol(index, self.symbol);
+        if self.verbose {
+            println!(
+                "{} ({}) played at index {}",
+                self.name,
+                self.symbol.to_str(),
+                index
+            );
+        }
+    }
 }
 
 pub struct HumanPlayer {
     name: String,
     symbol: Symbol,
+    verbose: bool,
 }
 
 impl HumanPlayer {
     pub fn new(name: String, symbol: Symbol) -> Self {
-        HumanPlayer { name, symbol }
+        HumanPlayer {
+            name,
+            symbol,
+            verbose: false,
+        }
     }
 }
 
@@ -134,8 +152,11 @@ impl Player for HumanPlayer {
         &self.name
     }
 
-    // TODO: Remove prints when it works
-    fn play_turn(&mut self, grid: &mut Grid) -> bool {
+    fn set_verbose(&mut self) {
+        self.verbose = true;
+    }
+
+    fn play_turn(&mut self, grid: &mut Grid) {
         let mut success = false;
         let mut input = 0;
         println!(
@@ -143,6 +164,7 @@ impl Player for HumanPlayer {
             self.name,
             self.symbol.to_str()
         );
+
         while !success {
             let mut input_str = String::new();
             std::io::stdin().read_line(&mut input_str).unwrap();
@@ -161,23 +183,21 @@ impl Player for HumanPlayer {
                 }
             }
         }
-        println!(
-            "{} ({}) played at index {}",
-            self.name,
-            self.symbol.to_str(),
-            input
-        );
-        true
+        if self.verbose {
+            println!(
+                "{} ({}) played at index {}",
+                self.name,
+                self.symbol.to_str(),
+                input
+            );
+        }
     }
-
-    fn you_won(&mut self) {}
-    fn you_lost(&mut self) {}
-    fn its_a_tie(&mut self) {}
 }
 
 pub struct MenacePlayer {
     name: String,
     symbol: Symbol,
+    verbose: bool,
     grids: Vec<[usize; 9]>,          // vector of matchboxes
     grids_this_game: Vec<usize>,     // indexes of grids played this game
     positions_this_game: Vec<usize>, // positions played this game
@@ -185,11 +205,12 @@ pub struct MenacePlayer {
 
 impl MenacePlayer {
     pub fn new(name: String, symbol: Symbol) -> Self {
-        let initial_matches = [255, 255, 255, 255, 255, 255, 255, 255, 255];
+        let initial_matches = [100, 100, 100, 100, 100, 100, 100, 100, 100];
         let grids = vec![initial_matches; 3_usize.pow(9) - 1];
         MenacePlayer {
             name,
             symbol,
+            verbose: false,
             grids,
             grids_this_game: Vec::new(),
             positions_this_game: Vec::new(),
@@ -199,10 +220,6 @@ impl MenacePlayer {
     pub fn reset(&mut self) {
         self.grids_this_game.clear();
         self.positions_this_game.clear();
-    }
-
-    pub fn get_grids(&self) -> &Vec<[usize; 9]> {
-        &self.grids
     }
 }
 
@@ -215,7 +232,11 @@ impl Player for MenacePlayer {
         &self.name
     }
 
-    fn play_turn(&mut self, grid: &mut Grid) -> bool {
+    fn set_verbose(&mut self) {
+        self.verbose = true;
+    }
+
+    fn play_turn(&mut self, grid: &mut Grid) {
         let index = grid_to_index(grid);
         let mut matchbox = self.grids[index];
 
@@ -245,39 +266,26 @@ impl Player for MenacePlayer {
         let dist = WeightedIndex::new(&weights).unwrap();
         let mut rng = rand::thread_rng();
         let selected_index = dist.sample(&mut rng);
-        // println!("{:?} index {}", weights, selected_index);
 
         self.grids_this_game.push(grid_to_index(grid));
         self.positions_this_game.push(selected_index);
 
         grid.set_symbol(selected_index, self.symbol);
-        // println!(
-        //     "{} ({}) played at index {}",
-        //     self.name,
-        //     self.symbol.to_str(),
-        //     selected_index
-        // );
-        true
+        if self.verbose {
+            println!(
+                "{} ({}) played at index {}",
+                self.name,
+                self.symbol.to_str(),
+                selected_index
+            );
+        }
     }
 
     fn you_won(&mut self) {
-        // println!("I won!");
-        // // let mut weights_before = Vec::new();
-        // // let mut weights_after = Vec::new();
-        // println!("{:?}", self.grids_this_game);
-        // println!("{:?}", self.positions_this_game);
-        // for grid in self.grids_this_game.iter() {
-        //     println!("Grid index: {}", grid);
-        //     index_to_grid(*grid).print();
-        // }
-
         for (i, &grid_index) in self.grids_this_game.iter().enumerate() {
-            // weights_before.push(self.grids[grid_index]);
-            self.grids[grid_index][self.positions_this_game[i]] += 1; // Increase the weight of the winning move
-            // weights_after.push(self.grids[grid_index]);
+            self.grids[grid_index][self.positions_this_game[i]] += 5; // Increase the weight of the winning move
         }
-        // println!("Weights before: {:?}", weights_before);
-        // println!("Weights after: {:?}", weights_after);
+
         self.reset();
     }
 
@@ -285,39 +293,16 @@ impl Player for MenacePlayer {
         for (i, &grid_index) in self.grids_this_game.iter().enumerate() {
             // Decrease the weight of the losing move, but min 0 using https://users.rust-lang.org/t/is-there-a-more-idiomatic-way-of-doing-this/56768/6
             self.grids[grid_index][self.positions_this_game[i]] =
-                match self.grids[grid_index][self.positions_this_game[i]].checked_sub(5) {
+                match self.grids[grid_index][self.positions_this_game[i]].checked_sub(10) {
                     Some(value) => value,
                     None => 0, // Prevent underflow
                 };
         }
 
-        // print number of overall modified matchboxes for debugging
-        // let mut x = 0;
-        // for (i, grid) in self
-        //     .grids
-        //     .iter()
-        //     .filter(|grid| grid.iter().any(|&weight| weight != 100))
-        //     .enumerate()
-        // {
-        //     x += 1;
-        // }
-        // println!("Number of modified matchboxes: {}", x);
-
         self.reset();
     }
 
     fn its_a_tie(&mut self) {
-        // println!("It's a tie!");
-        // let mut x = 0;
-        // for (i, grid) in self
-        //     .grids
-        //     .iter()
-        //     .filter(|grid| grid.iter().any(|&weight| weight != 100))
-        //     .enumerate()
-        // {
-        //     x += 1;
-        // }
-        // println!("Number of modified matchboxes: {}", x);
         self.reset();
     }
 }

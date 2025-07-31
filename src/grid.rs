@@ -1,7 +1,7 @@
 use crate::symbols::Symbol;
 
 // Array of Symbols seems cleanest for a small grid, since we already implemented the Symbol type
-// For larger/mutable grids I would use vector
+// For larger/variable len grids I would use vector
 pub struct Grid(pub [Symbol; 9]);
 
 impl Grid {
@@ -26,23 +26,6 @@ impl Grid {
                 println!("-----------");
             }
         }
-    }
-
-    pub fn get_pretty_string(&self) -> String {
-        let mut result = String::new();
-        for (i, row) in self.0.chunks(3).enumerate() {
-            for (j, &cell) in row.iter().enumerate() {
-                if j > 0 {
-                    result.push('|');
-                }
-                result.push_str(&format!(" {} ", cell.to_str()));
-            }
-            result.push('\n');
-            if i < 2 {
-                result.push_str("-----------\n");
-            }
-        }
-        result
     }
 
     pub fn set_symbol(&mut self, index: usize, symbol: Symbol) -> bool {
